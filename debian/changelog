@@ -1,0 +1,9 @@
+libtacplus-map (1.0.0-1) unstable; urgency=low
+
+  * Initial release of tacacs user mapping library
+  * libtacplus_map APIs to support local mapping, so that TACACS users do not
+    need to add TACACS+ accounts to /etc/passwd to supply home directory, uid,
+    and gid. TACACS+ users are mapped by privilege level to local tacacs0..15
+
+ -- Dave Olson <olson@cumulusnetworks.com>  Mon, 12 Sep 2016 15:58:27 -0700
+
