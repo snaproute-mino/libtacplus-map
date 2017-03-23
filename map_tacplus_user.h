@@ -29,7 +29,9 @@
 
 #define MAP_TACPLUS_FILE "/var/run/tacacs_client_map"
 
-#define MAP_FILE_VERSION 1 /* in case tacacs_mapping struct changes */
+#define MAP_FILE_VERSION 2 /*  version two adds tac_mapflags (compatible) */
+
+#define MAP_USERHOMEDIR 0x1 /* tac_mapflags: separate homedirs per account */
 
 /*
  * Structure to maintain mapping between login name and mapped tacacs name.
@@ -45,7 +47,8 @@ struct tacacs_mapping {
 # if __WORDSIZE == 32
     uint32_t __fill__[2]; /* to keep alignment the same for 32 and 64 bit */
 #endif
-    uint32_t tac_mapversion; /* mapping version that wrote this file */
+    uint16_t tac_mapversion; /* mapping version that wrote this file */
+    uint16_t tac_mapflags; /* flags such as MAP_USERHOMEDIR */
     uint32_t tac_session; /* session ID */
     uid_t tac_mapuid; /* for faster lookup, the login auid */
     char tac_logname[UT_NAMESIZE+1]; /* login name.  from utmp.h, + 1 for \0 */
@@ -55,7 +58,7 @@ struct tacacs_mapping {
 
 /* update the mapped user database */
 int update_mapuser(char *user, unsigned priv_level,
-    char *host); /* returns true/false */
+    char *host, unsigned); /* returns true/false */
 char *get_user_to_auth(char *pamuser); /* returns NULL or strdup'ed memory */
 unsigned map_get_sessionid(void); /* return the sessionid for this session */
 
@@ -74,7 +77,8 @@ unsigned map_get_sessionid(void); /* return the sessionid for this session */
  * if host is non-NULL, *host is set to the originating rhost, if any
  * It is a malloc'ed entry, and should be freed by the caller
  */
-char *lookup_logname(const char *mapname, uid_t auid, unsigned session, char **host);
+char *lookup_logname(const char *mapname, uid_t auid, unsigned session,
+    char **host, uint16_t *flags);
 
 /*
  * Similar to lookup_logname(), but by uid.
@@ -85,7 +89,7 @@ char *lookup_logname(const char *mapname, uid_t auid, unsigned session, char **h
  * pointer should be freed by the caller.
  */
 char *lookup_mapuid(uid_t uid, uid_t auid, unsigned session,
-                    char *mappedname, size_t maplen);
+                    char *mappedname, size_t maplen, uint16_t *flags);
 
 /*
  * Like lookup_logname(), but matches on the original login name,
@@ -93,9 +97,10 @@ char *lookup_mapuid(uid_t uid, uid_t auid, unsigned session,
  * otherwise returns the logname argument.  auid and session
  * will most commonly be -1 wildcards for this function.
  */
-char *lookup_mapname(const char *logname, uid_t auid, unsigned session, char **host); 
+char *lookup_mapname(const char *logname, uid_t auid, unsigned session,
+    char **host, uint16_t *flags); 
 
 /* This is not a public entry point, it's a helper routine for pam_tacplus */
-void __update_loguid(char *, char *, char *);
+void __update_loguid(char *);
 
 #endif
