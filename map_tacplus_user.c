@@ -56,7 +56,7 @@ static int is_mapmatch(struct tacacs_mapping *map, int which, const char *name,
         syslog(LOG_WARNING, "%s version of tacacs client_map_file %d"
             " != expected %d proceeding anyway", libname, map->tac_mapversion,
             MAP_FILE_VERSION);
-    if((session == -1 || map->tac_session == session) && 
+    if((session == -1 || map->tac_session == session) &&
         (auid == -1 || map->tac_mapuid == auid)) {
         if(!name)
             return 1; /* usually cleanup, just auid and session match */
@@ -159,7 +159,7 @@ char *lookup_logname(const char *mapname, uid_t auid, unsigned session,
  * Returns the original login username, and the mapped name
  * in the copied to the buffered pointed to by mapped
  * If auid and/or session are -1, they are wildcards, take
- * the first matching uid from the mapfile 
+ * the first matching uid from the mapfile
  * Returns NULL if not found.
  */
 char *lookup_mapuid(uid_t uid, uid_t auid, unsigned session,
@@ -203,7 +203,7 @@ char *lookup_mapuid(uid_t uid, uid_t auid, unsigned session,
  * will most commonly be -1 wildcards for this function.
  */
 char *lookup_mapname(const char *logname, uid_t auid, unsigned session,
-    char **host, uint16_t *flags) 
+    char **host, uint16_t *flags)
 {
     struct tacacs_mapping map;
     char *mappeduser = (char *)logname; /* if no match, return original */

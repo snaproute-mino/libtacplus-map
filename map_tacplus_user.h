@@ -98,7 +98,7 @@ char *lookup_mapuid(uid_t uid, uid_t auid, unsigned session,
  * will most commonly be -1 wildcards for this function.
  */
 char *lookup_mapname(const char *logname, uid_t auid, unsigned session,
-    char **host, uint16_t *flags); 
+    char **host, uint16_t *flags);
 
 /* This is not a public entry point, it's a helper routine for pam_tacplus */
 void __update_loguid(char *);
