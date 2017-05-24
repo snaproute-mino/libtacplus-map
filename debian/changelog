@@ -1,3 +1,11 @@
+libtacplus-map (1.0.1-1) unstable; urgency=low
+
+  * Minor corrections to Copyright and licensing files.
+  * Provide commented-out example allowing priv 15 TACACS users to sudo
+    without password in /etc/sudoers.d/tacplus
+
+ -- Dave Olson <olson@cumulusnetworks.com>  Tue, 29 Nov 2016 16:13:50 -0800
+
 libtacplus-map (1.0.0-1) unstable; urgency=low
 
   * Initial release of tacacs user mapping library
