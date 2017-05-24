@@ -52,11 +52,11 @@ static int debug; /* for developer debug */
 static int is_mapmatch(struct tacacs_mapping *map, int which, const char *name,
                        uid_t auid, unsigned session)
 {
-    if(map->tac_mapversion != MAP_FILE_VERSION)
+    if(map->tac_mapversion > MAP_FILE_VERSION || !map->tac_mapversion)
         syslog(LOG_WARNING, "%s version of tacacs client_map_file %d"
             " != expected %d proceeding anyway", libname, map->tac_mapversion,
             MAP_FILE_VERSION);
-    if((session == -1 || map->tac_session == session) && 
+    if((session == -1 || map->tac_session == session) &&
         (auid == -1 || map->tac_mapuid == auid)) {
         if(!name)
             return 1; /* usually cleanup, just auid and session match */
@@ -109,14 +109,17 @@ static int is_mapmatch(struct tacacs_mapping *map, int which, const char *name,
  *
  * If somebody kills, e.g., the session parent login or sshd, nothing is
  * left around to do the cleanup, and the entry could remain forever.
- * __update_loguid() does this on every add and delete.
+ * update_loguid() does this on every add and delete.
  */
-char *lookup_logname(const char *mapname, uid_t auid, unsigned session, char **host)
+char *lookup_logname(const char *mapname, uid_t auid, unsigned session,
+    char **host, uint16_t *flags)
 {
     struct tacacs_mapping map;
     char *origuser = (char *)mapname; /* if no match, return original */
     int fd, cnt;
 
+    if (flags)
+        *flags = 0; /* for early returns */
     fd = open(mapfile, O_RDONLY, 0600);
     if(fd == -1)
         return (char *)mapname; /* not using tacacs or might be earlier error */
@@ -137,6 +140,8 @@ char *lookup_logname(const char *mapname, uid_t auid, unsigned session, char **h
             }
             if(host)
                 *host = strndup(map.tac_rhost, sizeof map.tac_rhost);
+            if (flags)
+                *flags = map.tac_mapflags; /* for early returns */
             break;
         }
     }
@@ -154,11 +159,11 @@ char *lookup_logname(const char *mapname, uid_t auid, unsigned session, char **h
  * Returns the original login username, and the mapped name
  * in the copied to the buffered pointed to by mapped
  * If auid and/or session are -1, they are wildcards, take
- * the first matching uid from the mapfile 
+ * the first matching uid from the mapfile
  * Returns NULL if not found.
  */
 char *lookup_mapuid(uid_t uid, uid_t auid, unsigned session,
-                    char *mappedname, size_t maplen)
+                    char *mappedname, size_t maplen, uint16_t *flags)
 {
     struct tacacs_mapping map;
     int fd, cnt;
@@ -177,6 +182,8 @@ char *lookup_mapuid(uid_t uid, uid_t auid, unsigned session,
             is_mapmatch(&map, MATCH_LOGIN, NULL, auid, session)) {
             loginname = strdup(map.tac_logname); /* this may leak */
             snprintf(mappedname, maplen, "%s", map.tac_mappedname);
+            if (flags)
+                *flags = map.tac_mapflags; /* for early returns */
             break;
         }
     }
@@ -195,12 +202,15 @@ char *lookup_mapuid(uid_t uid, uid_t auid, unsigned session,
  * otherwise returns the logname argument.  auid and session
  * will most commonly be -1 wildcards for this function.
  */
-char *lookup_mapname(const char *logname, uid_t auid, unsigned session, char **host) 
+char *lookup_mapname(const char *logname, uid_t auid, unsigned session,
+    char **host, uint16_t *flags)
 {
     struct tacacs_mapping map;
     char *mappeduser = (char *)logname; /* if no match, return original */
     int fd, cnt;
 
+    if (flags)
+        *flags = 0; /* for early returns */
     fd = open(mapfile, O_RDONLY, 0600);
     if(fd == -1)
         return (char *)logname; /* not using tacacs or might be earlier error */
@@ -221,6 +231,8 @@ char *lookup_mapname(const char *logname, uid_t auid, unsigned session, char **h
             }
             if(host)
                 *host = strndup(map.tac_rhost, sizeof map.tac_rhost);
+            if (flags)
+                *flags = map.tac_mapflags; /* for early returns */
             break;
         }
     }
@@ -338,8 +350,8 @@ done:
  * check for stale (invalid) entries, and clean them up if found.
  * Called with the flock() held.
  *
- * Since we only have one version now, if the version doesn't match,
- * the entry is corrupt, so clear it.
+ * Always write the version to be our current version number.
+ * If it was different, we warned in is_match().
  */
 static void
 chk_cleanup_map(int fd)
@@ -355,7 +367,7 @@ chk_cleanup_map(int fd)
     (void)gettimeofday((struct timeval *)&map.tac_tv, NULL);
 
     while((cnt=read(fd, &tmap, sizeof tmap)) == sizeof tmap) {
-        if(tmap.tac_mapversion != MAP_FILE_VERSION ||
+        if(!tmap.tac_mapversion ||  tmap.tac_mapversion > MAP_FILE_VERSION ||
             ((tmap.tac_mapuid || tmap.tac_mappedname) &&
             tmap.tac_session && invalid_session(tmap.tac_session))) {
             off_t off = (off_t)-cnt;
@@ -398,14 +410,14 @@ chk_cleanup_map(int fd)
  * whenever we are doing the update.
  * Stale entries can occur when somebody kills, e.g., the session parent
  * login or sshd, nothing is left around to do the cleanup, and the entry could
- * remain forever.  __update_loguid() does this on every add and delete.
+ * remain forever.  update_loguid() does this on every add and delete.
  *
  * This would be static, but it needs to be exported to pam_tacplus.
  * It is not a public entry point.
 */
 
-void
-__update_loguid(char *newuser, char *olduser, char *rhost)
+static void
+update_loguid(char *newuser, char *olduser, char *rhost, uint16_t flags)
 {
     struct tacacs_mapping map, tmap;
     int fd, cnt, foundmatch = 0;
@@ -438,6 +450,7 @@ __update_loguid(char *newuser, char *olduser, char *rhost)
                  rhost ? rhost : "");
         map.tac_mapuid = auid;
         map.tac_session = session;
+        map.tac_mapflags = (uint16_t)(flags & MAP_USERHOMEDIR);
     }
 
     (void)gettimeofday((struct timeval *)&map.tac_tv, NULL);
@@ -492,6 +505,13 @@ done:
     close(fd);
 }
 
+/*  entry point from pam_tacplus for cleanup on close (logout) */
+void
+__update_loguid(char *newuser)
+{
+    update_loguid(newuser, NULL, NULL, 0);
+}
+
 /*
  * Set the audit login uid to be immutable; not supported on older libs/kernsls
  */
@@ -519,13 +539,14 @@ void set_auid_immutable(void)
  * Returns 1 if user was mapped (!islocal), 0 if not mapped
  */
 int
-update_mapuser(char *user, unsigned priv_level, char *rhost)
+update_mapuser(char *user, unsigned priv_level, char *rhost, unsigned flags)
 {
     FILE *pwfile;
     struct passwd *ent;
     char tacuser[9]; /* "tacacs" + up to two digits plus 0 */
     int islocal, foundtac;
     unsigned priv = priv_level;
+    unsigned isrestrict = 0;
     uid_t luid=0, tuid=0;
 
     pwfile = fopen("/etc/passwd", "r");
@@ -546,10 +567,12 @@ recheck:
         }
         else if(!strcmp(ent->pw_name, tacuser)) {
             foundtac++;
+            isrestrict = *ent->pw_shell == 'r';
             tuid = ent->pw_uid;
         }
     }
     if(islocal || foundtac) {
+        uint16_t homeflag;
         fclose(pwfile);
         pwfile = NULL;
         /*
@@ -564,7 +587,14 @@ recheck:
          * possible via the normal pam auth/session sequencing.
          */
         audit_setloginuid(islocal?luid:tuid); /* set auid */
-        __update_loguid(user, islocal?user:tacuser, rhost);
+        /*
+         * if USERHOMEDIR is set, we'll save that flag, and libnss-tacplus
+         *  will return the login name in the pw_dir field replacing the
+         *  local tacacsN homedir, unless the shell is a restricted shell,
+         *  indicating that per-command authorization is enabled.
+         */
+        homeflag = (foundtac && !isrestrict) ? flags&MAP_USERHOMEDIR : 0;
+        update_loguid(user, islocal?user:tacuser, rhost, homeflag);
         set_auid_immutable();
         if(debug && !islocal && priv != priv_level)
             syslog(LOG_DEBUG, "%s: Did not find local tacacs%u , using %s",
@@ -650,6 +680,6 @@ char *get_user_to_auth(char *pamuser)
     /* returns malloced string of original user, if found, which will
      * be a memory leak, but that shouldn't matter
      */
-    origuser = lookup_logname(pamuser, auid, session, NULL);
+    origuser = lookup_logname(pamuser, auid, session, NULL, NULL);
     return origuser ? origuser : pamuser;
 }

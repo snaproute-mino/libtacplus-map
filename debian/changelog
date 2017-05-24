@@ -1,3 +1,17 @@
+libtacplus-map (1.0.1-1) unstable; urgency=low
+
+  * API and map file change to support new user_homedir config variable.
+
+ -- Dave Olson <olson@cumulusnetworks.com>  Tue, 02 May 2017 12:28:44 -0700
+
+libtacplus-map (1.0.0-cl3u2) unstable; urgency=low
+
+  * Minor corrections to Copyright and licensing files.
+  * Provide commented-out example allowing priv 15 TACACS users to sudo
+    without password in /etc/sudoers.d/tacplus
+
+ -- Dave Olson <olson@cumulusnetworks.com>  Tue, 29 Nov 2016 16:13:50 -0800
+
 libtacplus-map (1.0.0-1) unstable; urgency=low
 
   * Initial release of tacacs user mapping library
