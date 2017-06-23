@@ -161,6 +161,10 @@ char *lookup_logname(const char *mapname, uid_t auid, unsigned session,
  * If auid and/or session are -1, they are wildcards, take
  * the first matching uid from the mapfile
  * Returns NULL if not found.
+ *
+ * NOTE: if this function ABI changes, sudo's plugins/sudoers/parse.c
+ * must be changed to match, since it dlopens and looks up and calls
+ * this function.
  */
 char *lookup_mapuid(uid_t uid, uid_t auid, unsigned session,
                     char *mappedname, size_t maplen, uint16_t *flags)
@@ -251,6 +255,10 @@ char *lookup_mapname(const char *logname, uid_t auid, unsigned session,
  * 0 is not a valid sessionid; default if no auditing is -1U
  * Don't cache the value, since it can change.
  * We export it for users of this library.
+ *
+ * NOTE: if this function ABI changes, sudo's plugins/sudoers/parse.c
+ * must be changed to match, since it dlopens and looks up and calls
+ * this function.
  */
 unsigned
 map_get_sessionid(void)
