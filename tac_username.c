@@ -4,7 +4,7 @@
 #include "map_tacplus_user.h"
 
 void usage() {
-        printf("USAGE: tac_username <localname>");
+        fprintf(stderr, "USAGE: tac_username <localname>\n");
 }
 
 int main (int argc, char **argv) {
